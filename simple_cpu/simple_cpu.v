@@ -44,16 +44,16 @@ register_file register_file_inst(
 .reset(reset), .read_reg_1(read_reg_1), .read_reg_2(read_reg_2), .write_reg(write_reg), .write_data(reg_write_data), .write_en(write_en), .data_out_1(data_out_1), .data_out_2(data_out_2)
 );
 
-
-reg [7:0] state;
+reg [7:0] state; //main state machine of the cpu
 reg [31:0] instruction_sav;
 reg [31:0] jump_add_reg;
 
+//states
 parameter IDLE = 0, IF_MEM = IDLE+1, ID = IF_MEM+1,
-          ALU_LD = ID+1, MEM_LD = ALU_LD+1, WB_LD = MEM_LD+1,
-          ALU_R = WB_LD+1, MEM_R=ALU_R+1, WB_R = MEM_R+1,
-          ALU_S=WB_R+1, MEM_S=ALU_S+1, WB_S = MEM_S+1,
-          ALU_IR=WB_S+1, MEM_IR=ALU_IR+1, WB_IR=MEM_IR+1,
+          EX_LD = ID+1, MEM_LD = EX_LD+1, WB_LD = MEM_LD+1,
+          EX_R = WB_LD+1, MEM_R=EX_R+1, WB_R = MEM_R+1,
+          EX_S=WB_R+1, MEM_S=EX_S+1, WB_S = MEM_S+1,
+          EX_IR=WB_S+1, MEM_IR=EX_IR+1, WB_IR=MEM_IR+1,
           EX_J=WB_IR+1, MEM_J=EX_J+1, WB_J=MEM_J+1,
           EX_UPC=WB_J+1, MEM_UPC=EX_UPC+1, WB_UPC=MEM_UPC+1,
           EX_LUI=WB_UPC+1, MEM_LUI=EX_LUI+1, WB_LUI=MEM_LUI+1,
@@ -70,9 +70,9 @@ wire [31:0] alu_out;
 wire alu_zero;
 wire alu_neg;
 
-//some csr regisers:
-reg [31:0] CSRegs [0:15]; //16 32bit words
+//some csr regisers, only to pass compliance tests:
 parameter mscratch = 0, mtvec = mscratch+1, mepc = mtvec+1, mcause = mepc+1, mtval = mcause+1;
+reg [31:0] CSRegs [0:mtval];
 
 
 alu alu_inst(
@@ -122,7 +122,7 @@ begin
          pc <= pc+4;
          read_req <= 1'b1;
          state <= ID;
-      end else begin
+      end else begin //jump to mtvec
          pc <= CSRegs[mtvec];
          CSRegs[mepc] <= pc;
          CSRegs[mtval] <= pc;
@@ -130,21 +130,22 @@ begin
       end
    end
    ID: begin
+      //main decoder
       if( read_data_valid == 1'b1) begin
          instruction_sav <= read_data;
          if ( read_data[6:0] == 7'b0000011) begin //load opcode
             read_reg_1 <= read_data[19:15];
-            state <= ALU_LD;
+            state <= EX_LD;
          end else if ( read_data[6:0] == 7'b0110011 ) begin // R type op (add and so)
             read_reg_1 <= read_data[19:15];
             read_reg_2 <= read_data[24:20];
-            state <= ALU_R;
+            state <= EX_R;
          end else if ( read_data[6:0] == 7'b0100011 ) begin //S type op (store)
             read_reg_1 <= read_data[19:15];
-            state <= ALU_S;
+            state <= EX_S;
          end else if ( read_data[6:0] == 7'b0010011 ) begin //math op immediate
             read_reg_1 <= read_data[19:15];
-            state <= ALU_IR;
+            state <= EX_IR;
          end else if ( read_data[6:0] == 7'b1101111 ) begin // JAL
             state <= EX_J;
          end else if ( read_data[6:0] == 7'b0010111 ) begin //auipc
@@ -170,7 +171,7 @@ begin
          read_req <= 1'b1;
       end
    end
-   ALU_LD: begin
+   EX_LD: begin
       //add the output of register with immediate
       alu_in1 <= data_out_1;
       alu_in2 <= {{20{instruction_sav[31]}}, instruction_sav[31:20]};
@@ -227,10 +228,10 @@ begin
          state <= IF_MEM;
       end else begin
          read_req <= 1'b1;
-         read_addr <= alu_out[31:0]; //TODO: alu out still valid?
+         read_addr <= alu_out[31:0];
       end
    end
-   ALU_R: begin
+   EX_R: begin
       alu_in1 <= data_out_1;
       alu_in2 <= data_out_2;
       alu_control <= {instruction_sav[30], instruction_sav[14:12]};
@@ -245,7 +246,7 @@ begin
       write_en <= 1'b1;
       state <= IF_MEM;
    end
-   ALU_S: begin
+   EX_S: begin
       //add the output of register with immediate
       alu_in1 <= data_out_1;
       alu_in2 <= { {20{instruction_sav[31]}}, instruction_sav[31:25], instruction_sav[11:7]}; //need to sign extend the constant
@@ -287,7 +288,7 @@ begin
    WB_S : begin
       state <= IF_MEM;
    end
-   ALU_IR: begin
+   EX_IR: begin
       alu_control <= {1'b0, instruction_sav[14:12]};
       alu_in1 <= data_out_1;
       if(instruction_sav[14:12] == 3'b000 || instruction_sav[14:12] == 3'b100 || instruction_sav[14:12] == 3'b110|| instruction_sav[14:12] == 3'b111
@@ -299,7 +300,6 @@ begin
       end else begin
          alu_in2 <= {20'b0, instruction_sav[31:20]};
       end
-      //  alu_control <= 4'b0;
       state <= MEM_IR;
    end
    MEM_IR: begin
@@ -351,23 +351,15 @@ begin
       state <= WB_LUI;
    end
    WB_LUI: begin
-      //reg_write_data <= {instruction_sav[31:12], data_out_1[11:0]};
       reg_write_data <= {instruction_sav[31:12], 12'b0}; //lui fills lowest 12b with 0
-      //reg_write_data <= {20'd2, data_out_1[11:0]}; //debug
       write_reg <= instruction_sav[11:7];
       write_en <= 1'b1;
       state <= IF_MEM;
    end
    EX_JALR : begin
-      //use the alu instead?
-      //jump_add_reg <= {data_out_1[31:20], 20'b0};
       alu_in1 <= data_out_1;
       alu_in2 <= {{20{instruction_sav[31]}}, instruction_sav[31:20]};
       alu_control <= 4'b0; //add
-
-      // write_addr <= 32'h4000;
-      //   write_req <= 1'b1;
-      //  write_data <= data_out_1;
 
       state <= MEM_JALR;
    end
@@ -399,7 +391,7 @@ begin
    end
    WB_BR: begin
       reg[31:0] offset = { {19{instruction_sav[31]}}, instruction_sav[31], instruction_sav[7], instruction_sav[30:25], instruction_sav[11:8], 1'b0};
-      if(instruction_sav[14:12] == 3'b000 && alu_zero == 1'b1) begin //beq
+      if(instruction_sav[14:12] == 3'b000 && alu_zero == 1'b1) begin //BEQ
          pc <= pc-4+offset;
       end else if (instruction_sav[14:12] == 3'b001 && alu_zero == 1'b0) begin //BNE
          pc <= pc-4+offset;
@@ -430,6 +422,7 @@ begin
          src = {27'b0, instruction_sav[19:15]};
       end
 
+      //juste have a few CSR registers, to pass compliance tests
       if(instruction_sav[31:20] == 12'h340) begin //mscratch
          csr_idx = mscratch;
       end else if (instruction_sav[31:20] == 12'h305) begin //mtvec
@@ -476,7 +469,6 @@ begin
    default: begin
    end
    endcase
-
 
 end
 

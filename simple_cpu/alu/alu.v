@@ -1,4 +1,4 @@
-//register file, 32 registers of 32bits
+// simple verilog implementation of an alu
 
 //allows to have unused signals
 /* verilator lint_off UNUSED */
@@ -9,10 +9,10 @@ in1, in2, control, out, zero, neg
 
 input [31:0] in1;
 input [31:0] in2;
-input [3:0] control;
+input [3:0] control; //operation selection, linked with riscv doc
 output wire [31:0] out;
-output wire zero;
-output wire neg;
+output wire zero; //is result equals to 0?
+output wire neg; //is result negative?
 
 wire [31:0] acc;
 

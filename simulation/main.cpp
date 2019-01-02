@@ -99,14 +99,14 @@ int main(int argc, char **argv) {
 
    std::cerr << "Reading first program header" << std::endl;
    Elf32_Phdr *elf_pheader;
-   elf_pheader = (Elf32_Phdr*)((void*)elf_array8+elf_header->e_phoff);
+   elf_pheader = (Elf32_Phdr*)((void*)(elf_array8+elf_header->e_phoff));
 
    std::cerr << "offset: 0x" << std::hex << elf_pheader->p_offset << std::endl;
    std::cerr << "vaddr: 0x" << std::hex << elf_pheader->p_vaddr << std::endl;
    std::cerr << "p_filesz: 0x" << std::hex << elf_pheader->p_filesz << std::endl;
 
    Elf32_Shdr *elf_sheaders;
-   elf_sheaders = (Elf32_Shdr*)((void*)elf_array8+elf_header->e_shoff);
+   elf_sheaders = (Elf32_Shdr*)((void*)(elf_array8+elf_header->e_shoff));
 
    uint32_t symtab_offset;
    uint32_t symtab_header_idx;
@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
          symtab_offset = elf_sheaders[i].sh_offset;
          symtab_header_idx = i;
          std::cerr << "found symtab at address: " << symtab_offset << std::endl;
-         elf_symtable = (Elf32_Sym*)((void*)elf_array8+elf_sheaders[i].sh_offset);
+         elf_symtable = (Elf32_Sym*)((void*)(elf_array8+elf_sheaders[i].sh_offset));
          // std::cerr << "name at: " << elf_sheaders[j].sh_name << std::endl;
       }
       if(strcmp( (char*)(elf_array8+shstrtab_offset+elf_sheaders[i].sh_name), ".strtab") == 0)
@@ -140,47 +140,6 @@ int main(int argc, char **argv) {
          std::cerr << "found strtab at address: " << strtab_offset << std::endl;
          // std::cerr << "name at: " << elf_sheaders[j].sh_name << std::endl;
       }
-
-
-      // if(elf_sheaders[i].sh_type == SHT_SYMTAB ) //symbol table found
-      // {
-      //    std::cerr << "This section is a symtab!" << std::endl;
-      //    std::cerr << "offset: " << elf_sheaders[i].sh_offset << std::endl;
-      //    std::cerr << "size: " << elf_sheaders[i].sh_size << std::endl;
-      //    std::cerr << "number of symbols in the table: " << elf_sheaders[i].sh_size/sizeof(Elf32_Sym) << std::endl;
-      //
-      //    uint32_t offset_strtab = 0;
-      //    uint32_t nb_symbols = elf_sheaders[i].sh_size/sizeof(Elf32_Sym);
-      //
-      //    //searching the strtab
-      //    for (size_t j = 0; j < nb_symbols; j++) {
-      //       std::cerr << "name of the symbol: " << (char*)(elf_array8+shstrtab_offset+elf_sheaders[j].sh_name) << std::endl;
-      //       if(strcmp( (char*)(elf_array8+shstrtab_offset+elf_sheaders[j].sh_name), ".strtab") == 0)
-      //       {
-      //          offset_strtab = elf_sheaders[j].sh_offset;
-      //          std::cerr << "found strtab at address: " << offset_strtab << std::endl;
-      //          // std::cerr << "name at: " << elf_sheaders[j].sh_name << std::endl;
-      //       }
-      //    }
-      //
-      //    Elf32_Sym *elf_symtable;
-      //    elf_symtable = (Elf32_Sym*)((void*)elf_array8+elf_sheaders[i].sh_offset);
-      //
-      //    for (size_t j = 0; j < nb_symbols; j++) {
-      //       std::cerr << "symbol number: " << j << std::endl;
-      //       std::cerr << "symbol name addr: " << elf_symtable[j].st_name << std::endl;
-      //       std::cerr << "symbol name: " << (char*)(&elf_array8[offset_strtab+elf_symtable[j].st_name]) << std::endl;
-      //    }
-
-         // Elf32_Sym
-         // typedef struct {
-         //     uint32_t      st_name;
-         //     Elf32_Addr    st_value;
-         //     uint32_t      st_size;
-         //     unsigned char st_info;
-         //     unsigned char st_other;
-         //     uint16_t      st_shndx;
-         // } Elf32_Sym;
    }
 
    uint32_t nb_symbols = elf_sheaders[symtab_header_idx].sh_size/sizeof(Elf32_Sym);
@@ -204,8 +163,6 @@ int main(int argc, char **argv) {
          std::cerr << "found end_signature at " << elf_symtable[i].st_value << std::endl;
       }
    }
-
-
 
    //init_simple_add();
    // init_add_test();
@@ -306,6 +263,7 @@ void eval_and_update_cpu(Vsimple_cpu *tb){
   }
 }
 
+//basic test to ensure basic working state of simulator
 void init_simple_add(){
   //lw $1, 0x100($0) 100 223  imm[11:0] rs1[19:15] "010"[14:12] rd[11:7] 0000011[6:0]
   Instruction ld;
