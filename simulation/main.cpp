@@ -20,33 +20,33 @@ uint8_t *memory;
 uint32_t *memory32;
 
 union Instruction{
-    struct Bits_I_type{
+   struct Bits_I_type{
       uint32_t opcode:7;
       uint32_t rd:5;
       uint32_t funct3:3;
       uint32_t rs1:5;
       uint32_t imm:12;
-    };
-    struct Bits_R_type{
+   };
+   struct Bits_R_type{
       uint32_t opcode:7;
       uint32_t rd:5;
       uint32_t funct3:3;
       uint32_t rs1:5;
       uint32_t rs2:5;
       uint32_t funct7:7;
-    };
-    struct Bits_S_type{
+   };
+   struct Bits_S_type{
       uint32_t opcode:7;
       uint32_t imm5:5;
       uint32_t funct3:3;
       uint32_t rs1:5;
       uint32_t rs2:5;
       uint32_t imm7:7;
-    };
-    Bits_I_type bits_i;
-    Bits_R_type bits_r;
-    Bits_S_type bits_s;
-    uint32_t word;
+   };
+   Bits_I_type bits_i;
+   Bits_R_type bits_r;
+   Bits_S_type bits_s;
+   uint32_t word;
 };
 
 int main(int argc, char **argv) {
