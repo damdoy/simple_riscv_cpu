@@ -16,24 +16,26 @@ module simple_cpu(
 clk, reset, read_req, read_addr, read_data, read_data_valid, write_req, write_addr, write_data, memory_mask, error_instruction, debug
 );
 
-input clk;
-input reset;
+input wire clk;
+input wire reset;
 output reg read_req;
 output reg [31:0] read_addr;
-input [31:0] read_data;
-input read_data_valid;
-output write_req;
-output [31:0] write_addr;
+input wire [31:0] read_data;
+input wire read_data_valid;
+output reg write_req;
+output reg [31:0] write_addr;
 output reg [31:0] write_data;
 output reg [3:0] memory_mask;
 output reg error_instruction;
 output reg [31:0] debug;
 
-wire [4:0] read_reg_1;
-wire [4:0] read_reg_2;
-wire [4:0] write_reg;
-wire [31:0] reg_write_data;
-wire write_en;
+reg read_1_en;
+reg read_2_en;
+reg [4:0] read_reg_1;
+reg [4:0] read_reg_2;
+reg [4:0] write_reg;
+reg [31:0] reg_write_data;
+reg write_en;
 wire [31:0] data_out_1;
 wire [31:0] data_out_2;
 
@@ -41,16 +43,17 @@ reg [31:0] pc;
 reg misaligned_load;
 
 register_file register_file_inst(
-.reset(reset), .read_reg_1(read_reg_1), .read_reg_2(read_reg_2), .write_reg(write_reg), .write_data(reg_write_data), .write_en(write_en), .data_out_1(data_out_1), .data_out_2(data_out_2)
+.clk(clk), .reset(reset), .rd_1_en(read_1_en), .rd_2_en(read_2_en), .read_reg_1(read_reg_1), .read_reg_2(read_reg_2), .write_reg(write_reg), .write_data(reg_write_data), .write_en(write_en), .data_out_1(data_out_1), .data_out_2(data_out_2)
 );
 
 reg [7:0] state; //main state machine of the cpu
+reg [7:0] future_state; //used when we have a buffer state
 reg [31:0] instruction_sav;
 reg [31:0] jump_add_reg;
 
 //states
-parameter IDLE = 0, IF_MEM = IDLE+1, ID = IF_MEM+1,
-          EX_LD = ID+1, MEM_LD = EX_LD+1, WB_LD = MEM_LD+1,
+parameter IDLE = 0, IF_MEM = IDLE+1, ID = IF_MEM+1, ID_BUF = ID+1,
+          EX_LD = ID_BUF+1, MEM_LD = EX_LD+1, WB_LD = MEM_LD+1,
           EX_R = WB_LD+1, MEM_R=EX_R+1, WB_R = MEM_R+1,
           EX_S=WB_R+1, MEM_S=EX_S+1, WB_S = MEM_S+1,
           EX_IR=WB_S+1, MEM_IR=EX_IR+1, WB_IR=MEM_IR+1,
@@ -86,6 +89,8 @@ initial begin
    write_addr = 32'b0;
    write_data = 32'b0;
 
+   read_1_en = 1'b0;
+   read_2_en = 1'b0;
    read_reg_1 = 5'b0;
    read_reg_2 = 5'b0;
    write_reg = 5'b0;
@@ -105,9 +110,15 @@ end
 //assign read_addr = pc_out[11:0];
 
 always @(posedge clk)
-begin
+begin : main
+   //local variables
+   reg[31:0] offset;
+   reg[31:0] src;
+   reg[31:0] csr_idx;
 
    //default
+   read_1_en <= 1'b0;
+   read_2_en <= 1'b0;
    read_req <= 1'b0;
    write_req <= 1'b0;
    write_en <= 1'b0;
@@ -133,42 +144,61 @@ begin
       //main decoder
       if( read_data_valid == 1'b1) begin
          instruction_sav <= read_data;
+         state <= ID_BUF;
          if ( read_data[6:0] == 7'b0000011) begin //load opcode
+            read_1_en <= 1'b1;
             read_reg_1 <= read_data[19:15];
-            state <= EX_LD;
+            future_state <= EX_LD;
          end else if ( read_data[6:0] == 7'b0110011 ) begin // R type op (add and so)
+            read_1_en <= 1'b1;
+            read_2_en <= 1'b1;
             read_reg_1 <= read_data[19:15];
             read_reg_2 <= read_data[24:20];
-            state <= EX_R;
+            future_state <= EX_R;
          end else if ( read_data[6:0] == 7'b0100011 ) begin //S type op (store)
+            read_1_en <= 1'b1;
             read_reg_1 <= read_data[19:15];
-            state <= EX_S;
+            future_state <= EX_S;
          end else if ( read_data[6:0] == 7'b0010011 ) begin //math op immediate
+            read_1_en <= 1'b1;
             read_reg_1 <= read_data[19:15];
-            state <= EX_IR;
+            future_state <= EX_IR;
          end else if ( read_data[6:0] == 7'b1101111 ) begin // JAL
-            state <= EX_J;
+            future_state <= EX_J;
          end else if ( read_data[6:0] == 7'b0010111 ) begin //auipc
-            state <= EX_UPC;
+            future_state <= EX_UPC;
          end else if ( read_data[6:0] == 7'b0110111 ) begin //lui
+            read_1_en <= 1'b1;
             read_reg_1 <= read_data[11:7];
-            state <= EX_LUI;
+            future_state <= EX_LUI;
          end else if ( read_data[6:0] == 7'b1100111 ) begin //jalr
+            read_1_en <= 1'b1;
             read_reg_1 <= read_data[19:15];
-            state <= EX_JALR;
+            future_state <= EX_JALR;
          end else if ( read_data[6:0] == 7'b1100011 ) begin //branch
+            read_1_en <= 1'b1;
+            read_2_en <= 1'b1;
             read_reg_1 <= read_data[19:15];
             read_reg_2 <= read_data[24:20];
-            state <= EX_BR;
+            future_state <= EX_BR;
          end else if ( read_data[6:0] == 7'b1110011 ) begin // system
+            read_1_en <= 1'b1;
             read_reg_1 <= read_data[19:15];
-            state <= EX_SYS;
+            future_state <= EX_SYS;
          end else begin //not recognized
             error_instruction <= 1'b1;
-            state <= IF_MEM;
+            future_state <= IF_MEM;
          end
       end else begin
          read_req <= 1'b1;
+         read_addr <= pc[31:0]-4; //pc has been incremented, but still need old instr
+      end
+   end
+   ID_BUF: begin //register file has 1clock delay, wait for the data read last state ....
+      state <= future_state;
+      if(future_state == EX_S) begin
+         read_1_en <= 1'b1;
+         read_reg_1 <= instruction_sav[24:20]; //load the reg for next cycle
       end
    end
    EX_LD: begin
@@ -252,7 +282,6 @@ begin
       alu_in2 <= { {20{instruction_sav[31]}}, instruction_sav[31:25], instruction_sav[11:7]}; //need to sign extend the constant
       //  debug <= alu_in2[31:0];
       alu_control <= 4'b0; //add
-      read_reg_1 <= instruction_sav[24:20]; //load the reg for next cycle
       //read_reg_2 <= 5'h0;
       state <= MEM_S;
    end
@@ -352,6 +381,7 @@ begin
    end
    WB_LUI: begin
       reg_write_data <= {instruction_sav[31:12], 12'b0}; //lui fills lowest 12b with 0
+      // debug <= {instruction_sav[31:12], 12'b0}; //lui fills lowest 12b with 0
       write_reg <= instruction_sav[11:7];
       write_en <= 1'b1;
       state <= IF_MEM;
@@ -390,7 +420,7 @@ begin
       state <= WB_BR;
    end
    WB_BR: begin
-      reg[31:0] offset = { {19{instruction_sav[31]}}, instruction_sav[31], instruction_sav[7], instruction_sav[30:25], instruction_sav[11:8], 1'b0};
+      offset = { {19{instruction_sav[31]}}, instruction_sav[31], instruction_sav[7], instruction_sav[30:25], instruction_sav[11:8], 1'b0};
       if(instruction_sav[14:12] == 3'b000 && alu_zero == 1'b1) begin //BEQ
          pc <= pc-4+offset;
       end else if (instruction_sav[14:12] == 3'b001 && alu_zero == 1'b0) begin //BNE
@@ -413,8 +443,6 @@ begin
       state <= WB_SYS;
    end
    WB_SYS: begin
-      reg[31:0] src;
-      reg[31:0] csr_idx;
 
       if(instruction_sav[14] == 1'b0) begin
          src = data_out_1;

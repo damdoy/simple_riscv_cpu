@@ -7,9 +7,9 @@ module alu(
 in1, in2, control, out, zero, neg
 );
 
-input [31:0] in1;
-input [31:0] in2;
-input [3:0] control; //operation selection, linked with riscv doc
+input wire [31:0] in1;
+input wire [31:0] in2;
+input wire [3:0] control; //operation selection, linked with riscv doc
 output wire [31:0] out;
 output wire zero; //is result equals to 0?
 output wire neg; //is result negative?
