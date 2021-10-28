@@ -1,1 +1,10 @@
+# Verilator
 obj_dir/
+
+# C
+a.out
+*.o
+*.elf
+
+#iverilog
+*.vcd

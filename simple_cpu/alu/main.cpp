@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
 #include "Valu.h"
 #include "verilated.h"
 
@@ -14,37 +16,37 @@ void cycle(Valu *tb, uint32_t in1, uint32_t in2, uint8_t alu_op){
   uint8_t neg = tb->neg;
 
   if(alu_op == 0){
-    expected_out = in1+in2;
+    expected_out = in1 + in2;
   }
-  else if(alu_op == 1){
-    expected_out = in1&in2;
+  else if(alu_op == 7){
+    expected_out = in1 & in2;
   }
-  else if(alu_op == 2){
-    expected_out = in1|in2;
+  else if(alu_op == 6){
+    expected_out = in1 | in2;
   }
-  else if(alu_op == 3){
-    expected_out = in1^in2;
+  else if(alu_op == 4){
+    expected_out = in1 ^ in2;
   }
-  else if(alu_op == 4){ //slt
+  else if(alu_op == 2){ //slt
     expected_out = ((int)in1 < (int)in2);
   }
-  else if(alu_op == 5){ //sltu
+  else if(alu_op == 3){ //sltu
     expected_out = (in1 < in2);
   }
-  else if(alu_op == 6){ //sll
+  else if(alu_op == 1){ //sll
     expected_out = (in1 << in2);
   }
-  else if(alu_op == 7){ //srl (logic)
+  else if(alu_op == 5){ //srl (logic)
     expected_out = (in1 >> in2);
   }
-  else if(alu_op == 8){ //sra (arith)
+  else if(alu_op == 13){ //sra (arith)
     expected_out = ( (int)in1 >> in2);
   }
-  else if(alu_op == 9){ //sub
-    expected_out = ( in1-in2 );
+  else if(alu_op == 8){ //sub
+    expected_out = in1 - in2;
   }
   
-  printf("in1:%d, in2:%d, op:%d, out:%d, zero:%d, neg:%d, expect_out:%d\n", in1, in2, alu_op, out, zero, neg, expected_out);
+  printf("in1: %d, \t\t in2: %d,\t op: %d,\t\t\t  out: %d,\t\t\t  zero: %d,\t neg: %d,\t expect_out: %d\n", in1, in2, alu_op, out, zero, neg, expected_out);
 
   if( (out != expected_out) || (zero != (expected_out == 0)) || (neg != ((int)expected_out < 0)) ){
     printf("failed\n");
@@ -70,52 +72,52 @@ int main(int argc, char **argv) {
   cycle(tb, 1001, -1, function);
   cycle(tb, 1234, -1234, function);
   
-  function = 1; //and
+  function = 7; //and
   cycle(tb, 23, 34, function);
   cycle(tb, -1, -1, function);
   cycle(tb, 1001, -1, function);
   cycle(tb, 1234, -1234, function);
   cycle(tb, 0x3, 0x4, function);
 
-  function = 2; //or
+  function = 6; //or
   cycle(tb, 23, 34, function);
   cycle(tb, -1, -1, function);
   cycle(tb, 1001, -1, function);
   cycle(tb, 1234, -1234, function);
   
-  function = 3; //xor
+  function = 4; //xor
   cycle(tb, 23, 34, function);
   cycle(tb, -1, -1, function);
   cycle(tb, 1001, -1, function);
   cycle(tb, 1234, -1234, function);
   
-  function = 4;//slt
+  function = 2;//slt
   cycle(tb, 232, 3277, function);
   cycle(tb, 4324, 24, function);
   cycle(tb, -1, 1, function);
   cycle(tb, -34, -2, function);
 
-  function = 5;//sltu
+  function = 3;//sltu
   cycle(tb, 232, 3277, function);
   cycle(tb, 4324, 24, function);
   cycle(tb, -1, 1, function);
   cycle(tb, -34, -2, function);
 
-  function = 6;//sll
+  function = 1;//sll
   cycle(tb, 1, 0, function);
   cycle(tb, 3, 4, function);
   cycle(tb, 423, 16, function);
   cycle(tb, 423, 31, function);
   cycle(tb, 2, 31, function);
 
-  function = 7;//srl
+  function = 5;//srl
   cycle(tb, 1, 0, function);
   cycle(tb, 3, 4, function);
   cycle(tb, 423, 16, function);
   cycle(tb, 423, 31, function);
   cycle(tb, 2, 31, function);
 
-  function = 8;//sra
+  function = 13;//sra
   cycle(tb, 1, 0, function);
   cycle(tb, -3, 4, function);
   cycle(tb, 423, 16, function);
@@ -123,7 +125,7 @@ int main(int argc, char **argv) {
   cycle(tb, -2, 31, function);
   cycle(tb, -512, 2, function);
 
-  function = 9;//sub
+  function = 8;//sub
   cycle(tb, 1, 0, function);
   cycle(tb, 0, -1, function);
   cycle(tb, -1, -1, function);

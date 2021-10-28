@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
 #include "Vregister_file.h"
 #include "verilated.h"
 
